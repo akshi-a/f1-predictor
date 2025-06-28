@@ -20,3 +20,11 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+
+# FastF1 cache
+backend/fastf1_cache/
+
+# Model and training artifacts
+backend/data/*.npy
+backend/data/*.pth
+backend/data/*.pkl
