@@ -1,8 +1,10 @@
 import os
 import pickle
 import pandas as pd
+import app.ml.utils
 
-from ..utils import get_driver_map
+
+from app.ml.utils import get_driver_map
 
 def load_pickle(path):
     with open(path, 'rb') as f:
@@ -52,3 +54,14 @@ def clean_race_data(race_dir: str, year: int, round_name: str) -> pd.DataFrame:
     merged_df['driver_name'] = merged_df['driver_id'].map(driver_map)
 
     return merged_df
+
+
+# Test the function
+if __name__ == "__main__":
+    test_dir = os.path.abspath("backend/data/fastf1_cache/2019/2019-08-04_Hungarian_Grand_Prix")
+    df = clean_race_data(
+        race_dir=test_dir,
+        year=2019,
+        round_name="Hungarian Grand Prix"
+    )
+    print(df.head())    
