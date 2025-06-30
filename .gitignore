@@ -28,3 +28,4 @@ backend/fastf1_cache/
 backend/data/*.npy
 backend/data/*.pth
 backend/data/*.pkl
+backend/data/fastf1_cache
