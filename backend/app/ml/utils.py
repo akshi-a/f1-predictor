@@ -1,6 +1,6 @@
 
 # Driver mappings
-def get_driver_map_2019():
+def get_driver_map():
     """
     Returns a dictionary mapping driver numbers (as strings) to driver names.
     This is a hardcoded map for the 2019 Hungarian Grand Prix drivers.
