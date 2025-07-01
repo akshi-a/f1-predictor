@@ -15,56 +15,41 @@ def load_pickle(path):
 
 
 
-
 def clean_race_data(race_dir: str, year: int, round_name: str) -> pd.DataFrame:
     print(f"🔧 Cleaning race: {round_name} ({year})")
 
-    # --- Load raw pickles ---
-    car_data_obj = load_pickle(os.path.join(race_dir, 'car_data.ff1pkl'))
-    car_data = car_data_obj['data'] if isinstance(car_data_obj, dict) and 'data' in car_data_obj else {}
+    # --- Load pickled data ---
+    laps_obj = load_pickle(os.path.join(race_dir, 'lap_count.ff1pkl'))
+    weather_obj = load_pickle(os.path.join(race_dir, 'weather_data.ff1pkl'))
+    results_obj = load_pickle(os.path.join(race_dir, 'position_data.ff1pkl'))
 
-    laps_df = load_pickle(os.path.join(race_dir, 'lap_count.ff1pkl'))
-    weather_df = load_pickle(os.path.join(race_dir, 'weather_data.ff1pkl'))
-    print("laps_df type:", type(laps_df))
-
-    # --- Combine car_data (per driver) ---
-    car_data_dfs = []
-    for driver_id, df in car_data.items():
-        if isinstance(df, pd.DataFrame):
-            df = df.copy()
-            df['driver_id'] = driver_id
-            car_data_dfs.append(df)
-        else:
-            print(f"⚠️ Skipping non-DataFrame entry for driver_id={driver_id} (type={type(df)})")
-
-    # Optional: downsample telemetry to 1Hz or last entry per lap
-    car_df = car_df.groupby(['driver_id']).tail(1)
+    # --- Extract DataFrames ---
+    laps_df = laps_obj.get('data') if isinstance(laps_obj, dict) else laps_obj
+    weather_df = weather_obj.get('data') if isinstance(weather_obj, dict) else weather_obj
+    results_df = results_obj.get('data') if isinstance(results_obj, dict) else results_obj
 
     # --- Clean laps ---
     if 'DriverNumber' in laps_df.columns:
         laps_df['driver_id'] = laps_df['DriverNumber'].astype(str)
 
-    useful_lap_cols = ['driver_id', 'LapNumber', 'LapTime', 'Compound', 'TyreLife', 'PitOutTime', 'PitInTime', 'Position']
-    laps_df = laps_df[useful_lap_cols]
+    lap_cols = ['driver_id', 'LapNumber', 'LapTime', 'Compound', 'TyreLife', 'PitOutTime', 'PitInTime', 'Position']
+    laps_df = laps_df[lap_cols]
 
-    # --- Clean weather ---
+    # --- Get last known weather ---
     weather_df = weather_df.sort_values('Time').drop_duplicates('Time')
-    last_weather = weather_df.iloc[-1]  # use last available value
+    last_weather = weather_df.iloc[-1]
     for col in ['AirTemp', 'TrackTemp', 'Humidity', 'Rainfall']:
-        car_df[col] = last_weather[col]
-
-    # --- Merge everything ---
-    merged_df = pd.merge(car_df, laps_df, on='driver_id', how='inner')
+        laps_df[col] = last_weather[col]
 
     # --- Add race context ---
-    merged_df['race_name'] = round_name
-    merged_df['year'] = year
+    laps_df['race_name'] = round_name
+    laps_df['year'] = year
 
     # --- Add driver names ---
     driver_map = get_driver_map()
-    merged_df['driver_name'] = merged_df['driver_id'].map(driver_map)
+    laps_df['driver_name'] = laps_df['driver_id'].map(driver_map)
 
-    return merged_df
+    return laps_df
 
 
 # Test the function
