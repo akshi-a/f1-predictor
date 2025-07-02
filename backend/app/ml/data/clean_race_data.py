@@ -76,7 +76,8 @@ def clean_race_data(race_root: str, year: int, round_name: str) -> pd.DataFrame:
 
 if __name__ == '__main__':
     df = clean_race_data(
-        race_root='backend/data/fastf1_cache/2019/2019-08-04_Hungarian_Grand_Prix',
+        race_root='/data/fastf1_cache/2019/2019-08-04_Hungarian_Grand_Prix/2019-08-04_Race',
+        #C:\CS Projects\f1-predictor\backend\app\ml\data\fastf1_cache\2019\2019-08-04_Hungarian_Grand_Prix\2019-08-04_Race
         year=2019,
         round_name='Hungarian Grand Prix'
     )
