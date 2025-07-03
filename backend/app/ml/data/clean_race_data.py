@@ -9,19 +9,11 @@ def load_pickle(path):
         return pickle.load(f)
 
 
-def find_session_subdir(race_dir):
-    # Find first subdirectory inside race_dir (e.g. '2019-08-04_Race')
-    for entry in os.listdir(race_dir):
-        full_path = os.path.join(race_dir, entry)
-        if os.path.isdir(full_path):
-            return full_path
-    return None
-
 
 def clean_race_data(race_root: str, year: int, round_name: str) -> pd.DataFrame:
     print(f"🔧 Cleaning race: {round_name} ({year})")
 
-    session_dir = find_session_subdir(race_root)
+    session_dir = race_root
     if not session_dir:
         raise FileNotFoundError(f"No session subdirectory found in {race_root}")
 
