@@ -38,24 +38,61 @@ def clean_race_data(race_root: str, year: int, round_name: str) -> pd.DataFrame:
     # Try loading weather data
     weather_path = os.path.join(session_dir, 'weather_data.ff1pkl')
     if os.path.exists(weather_path):
-        weather_df = load_pickle(weather_path)
-        latest_weather = weather_df.sort_values('Time').iloc[-1]
-        for col in ['AirTemp', 'TrackTemp', 'Humidity', 'Rainfall']:
-            merged_df[col] = latest_weather[col]
+        # Convert weather data to DataFrame
+        # Load weather
+        weather_raw = load_pickle(weather_path)
+        print(f"🔍 weather_raw type: {type(weather_raw)}")
+
+        # Check if it's a dict with a 'data' field
+        if isinstance(weather_raw, dict) and 'data' in weather_raw:
+            weather_df = pd.DataFrame(weather_raw['data'])  # ✅ this is the real weather data
+        elif isinstance(weather_raw, pd.DataFrame):
+            weather_df = weather_raw
+        else:
+            print(f"⚠️ Unexpected weather data format: {type(weather_raw)}. Skipping.")
+            weather_df = None
+
+        # Safely process weather
+        if weather_df is not None and 'Time' in weather_df.columns:
+            latest_weather = weather_df.sort_values('Time').iloc[-1]
+            for col in ['AirTemp', 'TrackTemp', 'Humidity', 'Rainfall']:
+                merged_df[col] = latest_weather.get(col, None)
+        else:
+            print("⚠️ Weather data malformed or missing 'Time'.")
     else:
         print("⚠️ No weather_data.ff1pkl found")
 
     # Try loading session results
-    results_path = os.path.join(session_dir, 'session_results.ff1pkl')
+    results_path = os.path.join(session_dir, 'position_data.ff1pkl')
     if os.path.exists(results_path):
-        results_df = load_pickle(results_path)
-        if not merged_df.empty:
+        results_raw = load_pickle(results_path)
+        print(f"🔍 results_df type: {type(results_raw)}")
+        
+
+        # Extract inner DataFrame
+        if isinstance(results_raw, dict) and 'data' in results_raw:
+            results_df = results_raw['data']
+        elif isinstance(results_raw, pd.DataFrame):
+            results_df = results_raw
+        else:
+            print(f"⚠️ Unexpected results data format: {type(results_raw)}. Skipping session results.")
+            results_df = None
+
+        # Merge if possible
+        if results_df is not None and not merged_df.empty:
+            # Ensure matching types for merge
+            results_df['DriverNumber'] = results_df['DriverNumber'].astype(str)
+            merged_df['driver_id'] = merged_df['driver_id'].astype(str)
+
             merged_df = merged_df.merge(
                 results_df[['DriverNumber', 'TeamName', 'Position']],
                 left_on='driver_id',
                 right_on='DriverNumber',
                 how='left'
             )
+        else:
+            print("⚠️ Skipping session results merge.")
+
     else:
         print("⚠️ No session_results.ff1pkl found")
 
