@@ -67,31 +67,42 @@ def clean_race_data(race_root: str, year: int, round_name: str) -> pd.DataFrame:
     if os.path.exists(results_path):
         results_raw = load_pickle(results_path)
         print(f"🔍 results_df type: {type(results_raw)}")
-        
 
-        # Extract inner DataFrame
+        # Convert raw dict-of-driver-results to DataFrame
+        results_df = None
         if isinstance(results_raw, dict) and 'data' in results_raw:
-            results_df = results_raw['data']
-        elif isinstance(results_raw, pd.DataFrame):
-            results_df = results_raw
+            raw_data = results_raw['data']
+            if isinstance(raw_data, dict):
+                # Each key is driver number, value is result dict
+                rows = []
+                for driver_num, result in raw_data.items():
+                    if isinstance(result, dict):
+                        result = result.copy()
+                        result['DriverNumber'] = str(driver_num)
+                        rows.append(result)
+                results_df = pd.DataFrame(rows)
+            elif isinstance(raw_data, pd.DataFrame):
+                results_df = raw_data
         else:
-            print(f"⚠️ Unexpected results data format: {type(results_raw)}. Skipping session results.")
+            print("⚠️ Unexpected session results structure. Skipping.")
             results_df = None
 
         # Merge if possible
         if results_df is not None and not merged_df.empty:
-            # Ensure matching types for merge
-            results_df['DriverNumber'] = results_df['DriverNumber'].astype(str)
-            merged_df['driver_id'] = merged_df['driver_id'].astype(str)
+            print("🧾 Results DataFrame columns:", results_df.columns)
+            required_cols = {'DriverNumber', 'TeamName', 'Position'}
+            if required_cols.issubset(results_df.columns):
+                results_df['DriverNumber'] = results_df['DriverNumber'].astype(str)
+                merged_df['driver_id'] = merged_df['driver_id'].astype(str)
 
-            merged_df = merged_df.merge(
-                results_df[['DriverNumber', 'TeamName', 'Position']],
-                left_on='driver_id',
-                right_on='DriverNumber',
-                how='left'
-            )
-        else:
-            print("⚠️ Skipping session results merge.")
+                merged_df = merged_df.merge(
+                    results_df[['DriverNumber', 'TeamName', 'Position']],
+                    left_on='driver_id',
+                    right_on='DriverNumber',
+                    how='left'
+                )
+            else:
+                print(f"⚠️ Missing expected columns in session results: {results_df.columns}")
 
     else:
         print("⚠️ No session_results.ff1pkl found")
