@@ -3,14 +3,11 @@ import pickle
 import pandas as pd
 from app.ml.utils import get_driver_map
 
-
 def load_pickle(path):
     with open(path, 'rb') as f:
         return pickle.load(f)
 
-
-
-def clean_race_data(race_root: str, year: int, round_name: str) -> pd.DataFrame:
+def clean_race_data(race_root: str, year: int, round_name: str, output_dir: str) -> pd.DataFrame:
     print(f"🔧 Cleaning race: {round_name} ({year})")
 
     session_dir = race_root
@@ -38,21 +35,17 @@ def clean_race_data(race_root: str, year: int, round_name: str) -> pd.DataFrame:
     # Try loading weather data
     weather_path = os.path.join(session_dir, 'weather_data.ff1pkl')
     if os.path.exists(weather_path):
-        # Convert weather data to DataFrame
-        # Load weather
         weather_raw = load_pickle(weather_path)
         print(f"🔍 weather_raw type: {type(weather_raw)}")
 
-        # Check if it's a dict with a 'data' field
         if isinstance(weather_raw, dict) and 'data' in weather_raw:
-            weather_df = pd.DataFrame(weather_raw['data'])  # ✅ this is the real weather data
+            weather_df = pd.DataFrame(weather_raw['data'])
         elif isinstance(weather_raw, pd.DataFrame):
             weather_df = weather_raw
         else:
             print(f"⚠️ Unexpected weather data format: {type(weather_raw)}. Skipping.")
             weather_df = None
 
-        # Safely process weather
         if weather_df is not None and 'Time' in weather_df.columns:
             latest_weather = weather_df.sort_values('Time').iloc[-1]
             for col in ['AirTemp', 'TrackTemp', 'Humidity', 'Rainfall']:
@@ -68,12 +61,10 @@ def clean_race_data(race_root: str, year: int, round_name: str) -> pd.DataFrame:
         results_raw = load_pickle(results_path)
         print(f"🔍 results_df type: {type(results_raw)}")
 
-        # Convert raw dict-of-driver-results to DataFrame
         results_df = None
         if isinstance(results_raw, dict) and 'data' in results_raw:
             raw_data = results_raw['data']
             if isinstance(raw_data, dict):
-                # Each key is driver number, value is result dict
                 rows = []
                 for driver_num, result in raw_data.items():
                     if isinstance(result, dict):
@@ -87,7 +78,6 @@ def clean_race_data(race_root: str, year: int, round_name: str) -> pd.DataFrame:
             print("⚠️ Unexpected session results structure. Skipping.")
             results_df = None
 
-        # Merge if possible
         if results_df is not None and not merged_df.empty:
             print("🧾 Results DataFrame columns:", results_df.columns)
             required_cols = {'DriverNumber', 'TeamName', 'Position'}
@@ -103,22 +93,25 @@ def clean_race_data(race_root: str, year: int, round_name: str) -> pd.DataFrame:
                 )
             else:
                 print(f"⚠️ Missing expected columns in session results: {results_df.columns}")
-
     else:
         print("⚠️ No session_results.ff1pkl found")
 
-    # Add context info
     merged_df['race_name'] = round_name
     merged_df['year'] = year
 
-    return merged_df
+    # --- Save as CSV ---
+    os.makedirs(output_dir, exist_ok=True)
+    csv_path = os.path.join(output_dir, f"{year}_{round_name.replace(' ', '_')}.csv")
+    merged_df.to_csv(csv_path, index=False)
+    print(f"✅ Saved cleaned race data to {csv_path}")
 
+    return merged_df
 
 if __name__ == '__main__':
     df = clean_race_data(
         race_root=r"C:\CS Projects\f1-predictor\backend\app\ml\data\fastf1_cache\2019\2019-08-04_Hungarian_Grand_Prix\2019-08-04_Race",
         year=2019,
-        round_name='Hungarian Grand Prix'
+        round_name='Hungarian Grand Prix',
+        output_dir=r"C:\CS Projects\f1-predictor\backend\app\ml\data\cleaned"
     )
     print(df.head())
-
