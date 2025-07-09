@@ -34,7 +34,23 @@ def clean_race_data(race_root: str, year: int, round_name: str) -> pd.DataFrame:
         # Downsample to 1Hz
         car_df['Date'] = pd.to_datetime(car_df['Date'])
         car_df = car_df.sort_values('Date')
-        car_df = car_df.groupby('driver_id').apply(lambda g: g.resample('1S', on='Date').nearest().dropna(how='all')).reset_index(drop=True)
+        
+        # Ensure Date is datetime
+        car_df['Date'] = pd.to_datetime(car_df['Date'])
+
+        # Downsample each driver’s telemetry to 1-second intervals
+        car_df = (
+            car_df
+            .set_index('Date')
+            .groupby('driver_id')
+            .apply(lambda g: g.resample('1s').nearest(limit=1))
+            .reset_index(level=0, drop=True)  # drop old groupby key
+            .reset_index()  # bring Date back from index to column
+        )
+
+
+
+
     else:
         print("⚠️ No car_data.ff1pkl found")
 
@@ -53,7 +69,21 @@ def clean_race_data(race_root: str, year: int, round_name: str) -> pd.DataFrame:
 
         pos_df['Date'] = pd.to_datetime(pos_df['Date'])
         pos_df = pos_df.sort_values('Date')
-        pos_df = pos_df.groupby('driver_id').apply(lambda g: g.resample('1S', on='Date').nearest().dropna(how='all')).reset_index(drop=True)
+        
+        # Downsample position data to 1-second intervals
+        pos_df['Date'] = pd.to_datetime(pos_df['Date'])
+        pos_df = pos_df.sort_values('Date')
+
+        pos_df = (
+            pos_df
+            .set_index('Date')
+            .groupby('driver_id')
+            .apply(lambda g: g.resample('1s').nearest(limit=1))
+            .reset_index(level=0, drop=True)
+            .reset_index()
+        )
+
+
     else:
         print("⚠️ No position_data.ff1pkl found")
 
@@ -74,26 +104,30 @@ def clean_race_data(race_root: str, year: int, round_name: str) -> pd.DataFrame:
     # === Weather data ===
     weather_path = os.path.join(race_root, 'weather_data.ff1pkl')
     if os.path.exists(weather_path):
+        # Convert weather data to DataFrame
+        # Load weather
         weather_raw = load_pickle(weather_path)
+        print(f"🔍 weather_raw type: {type(weather_raw)}")
+
+        # Check if it's a dict with a 'data' field
         if isinstance(weather_raw, dict) and 'data' in weather_raw:
-            weather_df = pd.DataFrame(weather_raw['data'])
+            weather_df = pd.DataFrame(weather_raw['data'])  # ✅ this is the real weather data
         elif isinstance(weather_raw, pd.DataFrame):
             weather_df = weather_raw
         else:
+            print(f"⚠️ Unexpected weather data format: {type(weather_raw)}. Skipping.")
             weather_df = None
 
+        # Safely process weather
         if weather_df is not None and 'Time' in weather_df.columns:
-            weather_df['Date'] = pd.to_datetime(weather_df['Time'])
-            weather_df = weather_df.sort_values('Date')
-
-            merged_df = pd.merge_asof(
-                merged_df.sort_values('Date'),
-                weather_df[['Date', 'AirTemp', 'TrackTemp', 'Humidity', 'Rainfall']],
-                on='Date',
-                direction='nearest'
-            )
+            latest_weather = weather_df.sort_values('Time').iloc[-1]
+            for col in ['AirTemp', 'TrackTemp', 'Humidity', 'Rainfall']:
+                merged_df[col] = latest_weather.get(col, None)
+        else:
+            print("⚠️ Weather data malformed or missing 'Time'.")
     else:
         print("⚠️ No weather_data.ff1pkl found")
+
 
     # Add context
     merged_df['race_name'] = round_name
